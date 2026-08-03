@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function obtenerAnthropic() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export type Capitulo = {
   titulo: string;
@@ -45,7 +47,7 @@ export async function generarContenidoInteractivo(textoLibro: string): Promise<L
   // (En una versión avanzada, se procesaría por bloques y se uniría el resultado.)
   const textoRecortado = textoLibro.slice(0, 100000);
 
-  const respuesta = await anthropic.messages.create({
+  const respuesta = await obtenerAnthropic().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8000,
     system: PROMPT_SISTEMA,

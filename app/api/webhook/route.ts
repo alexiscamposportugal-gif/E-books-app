@@ -3,9 +3,12 @@ import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { generarToken } from "@/lib/licencia";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+function obtenerStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!);
+}
 
 export async function POST(req: NextRequest) {
+  const stripe = obtenerStripe();
   const cuerpo = await req.text();
   const firma = req.headers.get("stripe-signature")!;
 

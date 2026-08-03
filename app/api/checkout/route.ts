@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+function obtenerStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!);
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const stripe = obtenerStripe();
     const { bookId, email } = await req.json();
 
     const { data: libro } = await supabaseAdmin
