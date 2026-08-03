@@ -48,7 +48,7 @@ export async function generarContenidoInteractivo(textoLibro: string): Promise<L
   const textoRecortado = textoLibro.slice(0, 100000);
 
   const modelo = obtenerGemini().getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.6-flash",
     systemInstruction: PROMPT_SISTEMA,
   });
 
