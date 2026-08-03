@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-function obtenerAnthropic() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function obtenerGemini() {
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 }
 
 export type Capitulo = {
@@ -47,18 +47,14 @@ export async function generarContenidoInteractivo(textoLibro: string): Promise<L
   // (En una versión avanzada, se procesaría por bloques y se uniría el resultado.)
   const textoRecortado = textoLibro.slice(0, 100000);
 
-  const respuesta = await obtenerAnthropic().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8000,
-    system: PROMPT_SISTEMA,
-    messages: [{ role: "user", content: textoRecortado }],
+  const modelo = obtenerGemini().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: PROMPT_SISTEMA,
   });
 
-  const bloqueTexto = respuesta.content.find((b) => b.type === "text");
-  if (!bloqueTexto || bloqueTexto.type !== "text") {
-    throw new Error("La IA no devolvió contenido de texto");
-  }
+  const resultado = await modelo.generateContent(textoRecortado);
+  const textoRespuesta = resultado.response.text();
 
-  const limpio = bloqueTexto.text.replace(/```json|```/g, "").trim();
+  const limpio = textoRespuesta.replace(/```json|```/g, "").trim();
   return JSON.parse(limpio) as LibroInteractivo;
 }

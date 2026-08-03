@@ -5,7 +5,7 @@ comprensión generadas por IA), la vende con Stripe, y entrega a cada comprador
 un enlace único y protegido que solo él puede usar.
 
 Todo el stack usado tiene capa **gratuita**: GitHub, Vercel, Supabase, Stripe (modo test).
-Solo la API de Anthropic tiene costo por uso (muy bajo, se paga solo cuando procesas un libro).
+Todo el stack, incluyendo la IA (Google Gemini), es 100% gratuito para empezar.
 
 ---
 
@@ -15,7 +15,7 @@ Solo la API de Anthropic tiene costo por uso (muy bajo, se paga solo cuando proc
 - Cuenta en [Vercel](https://vercel.com) (puedes entrar directamente con tu cuenta de GitHub)
 - Cuenta en [Supabase](https://supabase.com)
 - Cuenta en [Stripe](https://stripe.com) (usa el modo "Test" mientras no cobres de verdad)
-- Una clave de API de [Anthropic](https://console.anthropic.com) (esto sí tiene costo por uso, pero muy bajo)
+- Una clave gratis de [Google AI Studio / Gemini](https://aistudio.google.com/apikey) (no pide tarjeta de crédito)
 
 ---
 
@@ -67,7 +67,7 @@ Solo la API de Anthropic tiene costo por uso (muy bajo, se paga solo cuando proc
 1. Entra a vercel.com → **Add New > Project** → importa tu repositorio de GitHub.
 2. Antes de darle "Deploy", abre la sección **Environment Variables** y añade,
    una por una, todas las que están listadas en el archivo `.env.example` de este
-   proyecto, con tus valores reales (Supabase, Stripe, Anthropic, y también:
+   proyecto, con tus valores reales (Supabase, Stripe, Gemini, y también:
    - `JWT_SECRET`: cualquier frase larga aleatoria que inventes tú
    - `ADMIN_SECRET`: la contraseña que usarás para entrar a `/admin`
    - `NEXT_PUBLIC_APP_URL`: la pondrás después de tener el dominio, ej.

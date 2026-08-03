@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.45.4",
     "jsonwebtoken": "^9.0.2",
     "next": "14.2.35",
