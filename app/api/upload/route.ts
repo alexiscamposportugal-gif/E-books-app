@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (errorInsert || !libro) {
-      return NextResponse.json({ error: "No se pudo crear el registro del libro" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Supabase (crear libro): " + (errorInsert?.message || "error desconocido") },
+        { status: 500 }
+      );
     }
 
     // 2) Extraer el texto del PDF
