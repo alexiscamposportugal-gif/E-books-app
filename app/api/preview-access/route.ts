@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   const { data: libro } = await supabaseAdmin
     .from("books")
-    .select("title, status, interactive_content")
+    .select("title, status, portada_url, interactive_content")
     .eq("id", bookId)
     .single();
 

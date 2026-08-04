@@ -9,6 +9,7 @@ export default function AdminPage() {
   const [titulo, setTitulo] = useState("");
   const [precio, setPrecio] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [portada, setPortada] = useState<File | null>(null);
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [bookIdListo, setBookIdListo] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export default function AdminPage() {
 
     const formData = new FormData();
     formData.append("archivo", archivo);
+    if (portada) formData.append("portada", portada);
     formData.append("titulo", titulo);
     formData.append("precioCents", String(Math.round(parseFloat(precio || "0") * 100)));
 
@@ -87,6 +89,15 @@ export default function AdminPage() {
             accept="application/pdf"
             onChange={(e) => setArchivo(e.target.files?.[0] || null)}
             required
+            style={estiloInput}
+          />
+        </label>
+        <label>
+          Portada del libro (imagen, opcional)
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setPortada(e.target.files?.[0] || null)}
             style={estiloInput}
           />
         </label>

@@ -13,10 +13,17 @@ export type Pregunta = {
   explicacion: string;
 };
 
+export type BloqueContenido = {
+  tipo: "concepto" | "ejemplo" | "dato" | "cita" | "pasoapaso" | "advertencia";
+  titulo: string;
+  texto: string;
+  pasos?: string[];
+};
+
 export type Capitulo = {
   titulo: string;
   resumen: string;
-  contenido: string;
+  bloques: BloqueContenido[];
   puntosClave: string[];
   terminosClave: TerminoClave[];
   preguntas: Pregunta[];
@@ -30,32 +37,38 @@ export type LibroInteractivo = {
   capitulos: Capitulo[];
 };
 
-const PROMPT_SISTEMA = `Eres un diseñador instruccional experto en convertir libros en experiencias
-de aprendizaje interactivas, al estilo de las mejores apps educativas (tipo Duolingo o Brilliant,
-pero para libros de no ficción o texto). Recibirás el texto crudo de un libro y debes transformarlo
-en una estructura JSON completa para una mini-app interactiva. NO es un resumen para leer: es
-material para una app con la que el usuario interactúa activamente.
+const PROMPT_SISTEMA = `Eres un diseñador instruccional experto en convertir libros completos en productos
+digitales interactivos de alto valor — al nivel de apps como Brilliant, Blinkist Premium o un curso online
+premium. Recibirás el texto de un libro y debes transformarlo en una mini-app rica, profunda y explorable.
 
-Reglas estrictas:
-- Divide el contenido en capítulos o secciones lógicas (entre 3 y 12).
-- "descripcion": una frase (máx 20 palabras) que venda la promesa del libro, para mostrarla en
-  la portada de la mini-app.
-- "colorAcento": elige UN color hexadecimal (ej. "#e8a33d") que combine con la temática del libro
-  (cálido para libros de desarrollo personal, azul/verde para técnicos, etc.) — se usará como acento
-  visual en toda la mini-app.
-- Para cada capítulo:
-  - "titulo": corto y claro
-  - "resumen": 1-2 frases que enganchen, no que resuman de forma aburrida
-  - "contenido": el contenido reescrito de forma clara, pedagógica, en 3-6 párrafos cortos
-    (no copies el texto original extenso, sintetiza y explica con tus palabras)
-  - "puntosClave": 3-5 ideas accionables o memorables del capítulo, cada una en una frase corta
-    (se muestran como tarjetas destacadas, deben ser afirmaciones fuertes, no genéricas)
-  - "terminosClave": 2-5 términos o conceptos importantes del capítulo con su definición breve
-    (se muestran como tarjetas tipo flashcard que el usuario voltea para aprender)
-  - "preguntas": 2-4 preguntas de opción múltiple con 4 opciones, el índice (0-3) de la respuesta
-    correcta, y una "explicacion" breve de por qué es correcta (se muestra después de responder)
-  - "actividad": una pregunta abierta de reflexión o aplicación práctica relacionada al capítulo,
-    para que el usuario escriba su propia respuesta (no se evalúa, es para su propio aprendizaje)
+REGLA MÁS IMPORTANTE: esto NO es un resumen. El usuario está pagando por esta mini-app en vez de leer el
+libro, así que el contenido de cada capítulo debe cubrir el material real del libro con profundidad,
+manteniendo todos los argumentos, ejemplos, datos y matices importantes — simplemente reorganizado de forma
+interactiva y más fácil de digerir que un bloque de texto plano. Sé exhaustivo, no breve.
+
+Estructura por capítulo — en vez de un solo bloque de texto, divide el contenido en 5 a 10 "bloques"
+explorables (el usuario los verá como tarjetas que puede abrir en cualquier orden, no necesariamente
+lineal). Cada bloque tiene un "tipo":
+- "concepto": explica una idea o argumento central a fondo (150-250 palabras)
+- "ejemplo": un caso, historia o aplicación práctica concreta que ilustra un concepto
+- "dato": una cifra, estudio o dato curioso relevante, con contexto
+- "cita": una idea atribuible al autor/libro parafraseada (NUNCA cites literalmente el texto original,
+  siempre parafrasea con tus propias palabras)
+- "pasoapaso": si el capítulo describe un proceso o método, conviértelo en una lista de "pasos" concretos
+- "advertencia": un error común o malentendido que el libro señala
+
+Usa una mezcla de tipos por capítulo (no todos "concepto"), para que se sienta como explorar contenido
+variado, no leer un texto seguido.
+
+Reglas adicionales:
+- Divide el libro completo en entre 4 y 16 capítulos, según su extensión real — cubre TODO el libro,
+  no te detengas a la mitad.
+- "descripcion": una frase (máx 20 palabras) que venda la promesa del libro, para la portada de la app.
+- "colorAcento": UN color hexadecimal que combine con la temática del libro.
+- "puntosClave": 3-5 ideas accionables o memorables del capítulo.
+- "terminosClave": 3-6 términos importantes con definición breve (para un diccionario interactivo).
+- "preguntas": 2-4 preguntas de opción múltiple con explicación de la respuesta correcta.
+- "actividad": una pregunta abierta de reflexión o aplicación práctica.
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, siguiendo exactamente:
 {
@@ -66,7 +79,10 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, siguie
     {
       "titulo": "string",
       "resumen": "string",
-      "contenido": "string",
+      "bloques": [
+        { "tipo": "concepto", "titulo": "string", "texto": "string" },
+        { "tipo": "pasoapaso", "titulo": "string", "texto": "string", "pasos": ["string"] }
+      ],
       "puntosClave": ["string"],
       "terminosClave": [{ "termino": "string", "definicion": "string" }],
       "preguntas": [
@@ -83,12 +99,14 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, siguie
 }`;
 
 export async function generarContenidoInteractivo(textoLibro: string): Promise<LibroInteractivo> {
-  // Los libros largos se recortan para no exceder límites de contexto.
-  const textoRecortado = textoLibro.slice(0, 100000);
+  // Se recorta a un límite generoso (~300,000 caracteres, unas 250-300 páginas)
+  // para cubrir la gran mayoría de libros completos sin exceder el contexto del modelo.
+  const textoRecortado = textoLibro.slice(0, 300000);
 
   const modelo = obtenerGemini().getGenerativeModel({
     model: "gemini-3.6-flash",
     systemInstruction: PROMPT_SISTEMA,
+    generationConfig: { maxOutputTokens: 32768 },
   });
 
   const resultado = await modelo.generateContent(textoRecortado);

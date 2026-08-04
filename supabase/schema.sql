@@ -10,10 +10,20 @@ create table if not exists public.books (
   original_filename text,
   price_cents integer not null default 0,
   currency text not null default 'usd',
+  portada_url text,
   interactive_content jsonb,           -- aquí vive el resultado generado por la IA
   status text not null default 'processing', -- processing | ready | failed
   created_at timestamptz not null default now()
 );
+
+-- Si la tabla "books" ya existía de antes (versión previa de esta app),
+-- esta línea agrega la columna nueva sin borrar nada de lo que ya tenías:
+alter table public.books add column if not exists portada_url text;
+
+-- Bucket de almacenamiento público para las imágenes de portada
+insert into storage.buckets (id, name, public)
+values ('portadas', 'portadas', true)
+on conflict (id) do nothing;
 
 -- Tabla de licencias (una fila por cada venta = un acceso único)
 create table if not exists public.licenses (

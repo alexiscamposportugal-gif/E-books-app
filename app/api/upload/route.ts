@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const archivo = formData.get("archivo") as File | null;
+    const portada = formData.get("portada") as File | null;
     const titulo = (formData.get("titulo") as string) || "Libro sin título";
     const precioCents = parseInt((formData.get("precioCents") as string) || "0", 10);
 
@@ -40,6 +41,23 @@ export async function POST(req: NextRequest) {
         { error: "Supabase (crear libro): " + (errorInsert?.message || "error desconocido") },
         { status: 500 }
       );
+    }
+
+    // 1.1) Si se subió una imagen de portada, guardarla en Supabase Storage
+    if (portada && portada.size > 0) {
+      const extension = portada.name.split(".").pop() || "jpg";
+      const rutaPortada = `${libro.id}.${extension}`;
+      const bufferPortada = Buffer.from(await portada.arrayBuffer());
+
+      const { error: errorSubida } = await supabaseAdmin.storage
+        .from("portadas")
+        .upload(rutaPortada, bufferPortada, { contentType: portada.type, upsert: true });
+
+      if (!errorSubida) {
+        const { data: urlPublica } = supabaseAdmin.storage.from("portadas").getPublicUrl(rutaPortada);
+        await supabaseAdmin.from("books").update({ portada_url: urlPublica.publicUrl }).eq("id", libro.id);
+      }
+      // Si falla la portada no detenemos el proceso: el libro se genera igual, solo sin imagen.
     }
 
     // 2) Extraer el texto del PDF

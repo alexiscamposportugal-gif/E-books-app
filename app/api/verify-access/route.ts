@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { data: libro } = await supabaseAdmin
     .from("books")
-    .select("title, interactive_content")
+    .select("title, portada_url, interactive_content")
     .eq("id", licencia.book_id)
     .single();
 
