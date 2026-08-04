@@ -11,6 +11,7 @@ export default function AdminPage() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
+  const [bookIdListo, setBookIdListo] = useState<string | null>(null);
 
   async function manejarEnvio(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +36,8 @@ export default function AdminPage() {
       if (data.error) {
         setResultado("❌ Error: " + data.error);
       } else {
-        setResultado(`✅ Listo. ID del libro: ${data.bookId}. Enlace de venta: /comprar/${data.bookId}`);
+        setResultado(`✅ Listo. ID del libro: ${data.bookId}`);
+        setBookIdListo(data.bookId);
       }
     } catch (err: any) {
       setResultado("❌ Error: " + err.message);
@@ -105,6 +107,41 @@ export default function AdminPage() {
         </button>
       </form>
       {resultado && <p style={{ marginTop: 20 }}>{resultado}</p>}
+
+      {bookIdListo && (
+        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a
+            href={`/libro/${bookIdListo}?preview=1`}
+            target="_blank"
+            style={{
+              background: "#e8a33d",
+              color: "#121319",
+              padding: "10px 16px",
+              borderRadius: 8,
+              textDecoration: "none",
+              fontWeight: 700,
+              fontSize: 13.5,
+            }}
+          >
+            🔍 Ver vista previa
+          </a>
+          <a
+            href={`/comprar/${bookIdListo}`}
+            target="_blank"
+            style={{
+              background: "rgba(255,255,255,0.1)",
+              color: "white",
+              padding: "10px 16px",
+              borderRadius: 8,
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: 13.5,
+            }}
+          >
+            🔗 Enlace de venta
+          </a>
+        </div>
+      )}
     </main>
   );
 }

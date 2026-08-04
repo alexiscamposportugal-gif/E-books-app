@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 type TerminoClave = { termino: string; definicion: string };
 type Pregunta = {
@@ -37,18 +37,42 @@ function obtenerIdDispositivo(): string {
 }
 
 export default function LibroPage() {
+  const params = useParams();
+  const bookId = params.id as string;
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const esVistaPrevia = searchParams.get("preview") === "1";
 
-  const [estado, setEstado] = useState<"cargando" | "denegado" | "ok">("cargando");
+  const [estado, setEstado] = useState<"cargando" | "denegado" | "ok" | "pedir-clave">(
+    esVistaPrevia ? "pedir-clave" : "cargando"
+  );
   const [motivoDenegado, setMotivoDenegado] = useState("");
   const [libro, setLibro] = useState<LibroInteractivo | null>(null);
   const [vista, setVista] = useState<"portada" | number>("portada");
   const [completados, setCompletados] = useState<Set<number>>(new Set());
+  const [claveAdmin, setClaveAdmin] = useState("");
 
   const claveProgreso = `progreso_${token}`;
 
+  async function verificarVistaPrevia() {
+    setEstado("cargando");
+    const res = await fetch("/api/preview-access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookId, claveAdmin }),
+    });
+    const data = await res.json();
+    if (data.valido) {
+      setLibro(data.libro.interactive_content);
+      setEstado("ok");
+    } else {
+      setMotivoDenegado(data.motivo || "Acceso denegado");
+      setEstado("pedir-clave");
+    }
+  }
+
   useEffect(() => {
+    if (esVistaPrevia) return; // en modo vista previa se espera a que el admin escriba su clave
     if (!token) {
       setEstado("denegado");
       setMotivoDenegado("Falta el enlace de acceso");
@@ -89,6 +113,47 @@ export default function LibroPage() {
 
   if (estado === "cargando") return <CentroTexto>Verificando tu acceso...</CentroTexto>;
   if (estado === "denegado") return <CentroTexto>🔒 {motivoDenegado}</CentroTexto>;
+  if (estado === "pedir-clave") {
+    return (
+      <main style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+        <div style={{ width: 320, textAlign: "center" }}>
+          <p style={{ fontSize: 15, marginBottom: 14 }}>🔍 Modo vista previa</p>
+          <input
+            type="password"
+            placeholder="Clave de administrador"
+            value={claveAdmin}
+            onChange={(e) => setClaveAdmin(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && verificarVistaPrevia()}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.05)",
+              color: "#f2f0ea",
+              marginBottom: 10,
+            }}
+          />
+          <button
+            onClick={verificarVistaPrevia}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 8,
+              border: "none",
+              background: "#e8a33d",
+              color: "#121319",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Ver vista previa
+          </button>
+          {motivoDenegado && <p style={{ color: "#f08080", fontSize: 13, marginTop: 10 }}>{motivoDenegado}</p>}
+        </div>
+      </main>
+    );
+  }
   if (!libro) return <CentroTexto>Cargando libro...</CentroTexto>;
 
   const acento = libro.colorAcento || "#e8a33d";
@@ -187,6 +252,22 @@ export default function LibroPage() {
 
       {/* Contenido principal */}
       <main style={{ flex: 1, padding: "48px 40px", maxWidth: 760 }}>
+        {esVistaPrevia && (
+          <div
+            style={{
+              background: "#e8a33d22",
+              border: "1px solid #e8a33d55",
+              color: "#e8a33d",
+              fontSize: 12.5,
+              padding: "6px 12px",
+              borderRadius: 8,
+              display: "inline-block",
+              marginBottom: 20,
+            }}
+          >
+            🔍 Estás viendo el modo vista previa (no cuenta como una compra)
+          </div>
+        )}
         {vista === "portada" ? (
           <Portada libro={libro} acento={acento} onComenzar={() => setVista(0)} completados={completados} />
         ) : (
