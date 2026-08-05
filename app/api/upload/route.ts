@@ -12,25 +12,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const formData = await req.formData();
-    const archivo = formData.get("archivo") as File | null;
-    const portada = formData.get("portada") as File | null;
-    const titulo = (formData.get("titulo") as string) || "Libro sin título";
-    const precioCents = parseInt((formData.get("precioCents") as string) || "0", 10);
+    const { rutaPdf, rutaPortada, titulo, precioCents, nombreOriginal } = await req.json();
 
-    if (!archivo) {
-      return NextResponse.json({ error: "No se recibió ningún archivo" }, { status: 400 });
+    if (!rutaPdf) {
+      return NextResponse.json({ error: "Falta la referencia del PDF ya subido" }, { status: 400 });
     }
-
-    const buffer = Buffer.from(await archivo.arrayBuffer());
 
     // 1) Crear el registro del libro en estado "processing"
     const { data: libro, error: errorInsert } = await supabaseAdmin
       .from("books")
       .insert({
-        title: titulo,
-        original_filename: archivo.name,
-        price_cents: precioCents,
+        title: titulo || "Libro sin título",
+        original_filename: nombreOriginal || null,
+        price_cents: precioCents || 0,
         status: "processing",
       })
       .select()
@@ -43,36 +37,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1.1) Si se subió una imagen de portada, guardarla en Supabase Storage
-    if (portada && portada.size > 0) {
-      const extension = portada.name.split(".").pop() || "jpg";
-      const rutaPortada = `${libro.id}.${extension}`;
-      const bufferPortada = Buffer.from(await portada.arrayBuffer());
-
-      const { error: errorSubida } = await supabaseAdmin.storage
-        .from("portadas")
-        .upload(rutaPortada, bufferPortada, { contentType: portada.type, upsert: true });
-
-      if (!errorSubida) {
-        const { data: urlPublica } = supabaseAdmin.storage.from("portadas").getPublicUrl(rutaPortada);
-        await supabaseAdmin.from("books").update({ portada_url: urlPublica.publicUrl }).eq("id", libro.id);
-      }
-      // Si falla la portada no detenemos el proceso: el libro se genera igual, solo sin imagen.
+    // 1.1) Si se subió una portada, guardar su URL pública
+    if (rutaPortada) {
+      const { data: urlPublica } = supabaseAdmin.storage.from("portadas").getPublicUrl(rutaPortada);
+      await supabaseAdmin.from("books").update({ portada_url: urlPublica.publicUrl }).eq("id", libro.id);
     }
 
-    // 2) Extraer el texto del PDF
+    // 2) Descargar el PDF desde Supabase Storage (ya subido directo desde el navegador)
+    const { data: archivoPdf, error: errorDescarga } = await supabaseAdmin.storage
+      .from("libros-pdf")
+      .download(rutaPdf);
+
+    if (errorDescarga || !archivoPdf) {
+      await supabaseAdmin.from("books").update({ status: "failed" }).eq("id", libro.id);
+      return NextResponse.json(
+        { error: "No se pudo descargar el PDF subido: " + (errorDescarga?.message || "error desconocido") },
+        { status: 500 }
+      );
+    }
+    const buffer = Buffer.from(await archivoPdf.arrayBuffer());
+
+    // 3) Extraer el texto del PDF
     const pdfParse = (await import("pdf-parse")).default;
     const datosExtraidos = await pdfParse(buffer);
     const textoPlano = datosExtraidos.text;
 
-    // 3) Generar el contenido interactivo con IA
+    // 4) Generar el contenido interactivo con IA
     const contenidoInteractivo = await generarContenidoInteractivo(textoPlano);
 
-    // 4) Guardar el resultado y marcar como listo
+    // 5) Guardar el resultado y marcar como listo
     await supabaseAdmin
       .from("books")
       .update({ interactive_content: contenidoInteractivo, status: "ready" })
       .eq("id", libro.id);
+
+    // El PDF original ya cumplió su función (generar el contenido); se borra
+    // del bucket para no ocupar espacio de almacenamiento gratuito innecesariamente.
+    await supabaseAdmin.storage.from("libros-pdf").remove([rutaPdf]);
 
     return NextResponse.json({ success: true, bookId: libro.id });
   } catch (error: any) {

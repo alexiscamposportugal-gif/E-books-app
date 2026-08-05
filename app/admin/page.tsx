@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AdminPage() {
   const [claveAdmin, setClaveAdmin] = useState(
@@ -11,28 +12,60 @@ export default function AdminPage() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [portada, setPortada] = useState<File | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [etapa, setEtapa] = useState("");
   const [resultado, setResultado] = useState<string | null>(null);
   const [bookIdListo, setBookIdListo] = useState<string | null>(null);
+
+  // Sube un archivo directo a Supabase Storage (sin pasar por Vercel),
+  // usando una URL de subida firmada que solo se entrega si la clave de
+  // administrador es correcta.
+  async function subirArchivoDirecto(archivoASubir: File, carpeta: "pdf" | "portada") {
+    const resSolicitud = await fetch("/api/solicitar-subida", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-secret": claveAdmin },
+      body: JSON.stringify({ nombreArchivo: archivoASubir.name, carpeta }),
+    });
+    const solicitud = await resSolicitud.json();
+    if (solicitud.error) throw new Error(solicitud.error);
+
+    const { error: errorSubida } = await supabase.storage
+      .from(solicitud.bucket)
+      .uploadToSignedUrl(solicitud.ruta, solicitud.token, archivoASubir);
+
+    if (errorSubida) throw new Error("Subiendo " + carpeta + ": " + errorSubida.message);
+
+    return solicitud.ruta as string;
+  }
 
   async function manejarEnvio(e: React.FormEvent) {
     e.preventDefault();
     if (!archivo) return;
     setCargando(true);
     setResultado(null);
-
-    const formData = new FormData();
-    formData.append("archivo", archivo);
-    if (portada) formData.append("portada", portada);
-    formData.append("titulo", titulo);
-    formData.append("precioCents", String(Math.round(parseFloat(precio || "0") * 100)));
-
+    setBookIdListo(null);
     sessionStorage.setItem("clave_admin", claveAdmin);
 
     try {
+      setEtapa("Subiendo el PDF...");
+      const rutaPdf = await subirArchivoDirecto(archivo, "pdf");
+
+      let rutaPortada: string | null = null;
+      if (portada) {
+        setEtapa("Subiendo la portada...");
+        rutaPortada = await subirArchivoDirecto(portada, "portada");
+      }
+
+      setEtapa("Generando el contenido interactivo con IA (puede tardar 1-3 min)...");
       const res = await fetch("/api/upload", {
         method: "POST",
-        headers: { "x-admin-secret": claveAdmin },
-        body: formData,
+        headers: { "Content-Type": "application/json", "x-admin-secret": claveAdmin },
+        body: JSON.stringify({
+          rutaPdf,
+          rutaPortada,
+          titulo,
+          nombreOriginal: archivo.name,
+          precioCents: Math.round(parseFloat(precio || "0") * 100),
+        }),
       });
       const data = await res.json();
       if (data.error) {
@@ -45,6 +78,7 @@ export default function AdminPage() {
       setResultado("❌ Error: " + err.message);
     } finally {
       setCargando(false);
+      setEtapa("");
     }
   }
 
@@ -64,12 +98,7 @@ export default function AdminPage() {
         </label>
         <label>
           Título del libro
-          <input
-            value={titulo}
-            onChange={(e) => setTitulo(e.target.value)}
-            required
-            style={estiloInput}
-          />
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required style={estiloInput} />
         </label>
         <label>
           Precio de venta (USD)
@@ -114,7 +143,7 @@ export default function AdminPage() {
             cursor: "pointer",
           }}
         >
-          {cargando ? "Procesando (puede tardar 1-2 min)..." : "Generar mini-app interactiva"}
+          {cargando ? etapa || "Procesando..." : "Generar mini-app interactiva"}
         </button>
       </form>
       {resultado && <p style={{ marginTop: 20 }}>{resultado}</p>}

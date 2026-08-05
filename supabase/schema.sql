@@ -25,6 +25,11 @@ insert into storage.buckets (id, name, public)
 values ('portadas', 'portadas', true)
 on conflict (id) do nothing;
 
+-- Bucket privado para los PDFs originales (no debe ser público, son el material que se vende)
+insert into storage.buckets (id, name, public)
+values ('libros-pdf', 'libros-pdf', false)
+on conflict (id) do nothing;
+
 -- Tabla de licencias (una fila por cada venta = un acceso único)
 create table if not exists public.licenses (
   id uuid primary key default gen_random_uuid(),
